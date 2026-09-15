@@ -1,40 +1,26 @@
 import { useEffect, useState } from "react";
-import { APPS_SCRIPT_URL } from "../config";
-import { PIN_STORAGE_KEY } from "./PinGate";
+import { previewSettlement, commitSettlement } from "../lib/firestoreApi";
+import { unlockWithPin } from "../lib/session";
 import SettlementSummary from "./SettlementSummary";
 import "./ChotSo.css";
 
-async function postAction(payload) {
-  const res = await fetch(APPS_SCRIPT_URL, {
-    method: "POST",
-    // text/plain để tránh CORS preflight với Apps Script Web App
-    headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify(payload),
-  });
-  const data = await res.json();
-  if (data.result !== "success") throw new Error(data.error || "Lỗi không xác định");
-  return data;
-}
-
 export default function ChotSo({ thanhVienList, onPinRejected }) {
-  const pin = localStorage.getItem(PIN_STORAGE_KEY) || "";
-
   const [preview, setPreview] = useState(null);
   const [loadError, setLoadError] = useState("");
 
   const [nguoiChot, setNguoiChot] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
-  const [confirmPin, setConfirmPin] = useState(pin);
+  const [confirmPin, setConfirmPin] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState(null); // { type: 'success' | 'error', message }
   const [result, setResult] = useState(null); // kết quả sau khi chốt thành công
 
   useEffect(() => {
-    postAction({ action: "chotSoPreview", pin })
+    previewSettlement(thanhVienList)
       .then(setPreview)
       .catch((err) => {
         setLoadError("Không tải được số liệu: " + err.message);
-        if (err.message.indexOf("PIN") !== -1) onPinRejected?.();
+        if (err.code === "permission-denied") onPinRejected?.();
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -44,18 +30,23 @@ export default function ChotSo({ thanhVienList, onPinRejected }) {
     setStatus(null);
     setSubmitting(true);
     try {
-      const data = await postAction({
-        action: "chotSo",
-        pin: confirmPin,
+      // Xác nhận lại PIN trước khi chốt - dùng lại đúng cơ chế unlock (Firestore
+      // Rules so khớp config/pin phía server), không phải chỉ là bước UI cho có.
+      await unlockWithPin(confirmPin);
+      const data = await commitSettlement({
         nguoiChot,
         userAgent: navigator.userAgent,
+        memberNames: thanhVienList,
       });
       setResult(data);
       setShowConfirm(false);
       setStatus({ type: "success", message: `Đã chốt sổ xong (kỳ ${data.kyId}).` });
     } catch (err) {
-      setStatus({ type: "error", message: "Chốt sổ thất bại: " + err.message });
-      if (err.message.indexOf("PIN") !== -1) onPinRejected?.();
+      const wrongPin = err.code === "permission-denied";
+      setStatus({
+        type: "error",
+        message: wrongPin ? "Mã PIN xác nhận không đúng." : "Chốt sổ thất bại: " + err.message,
+      });
     } finally {
       setSubmitting(false);
     }

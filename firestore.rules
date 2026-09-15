@@ -1,12 +1,101 @@
 rules_version = '2';
 
-// Chặn toàn bộ đọc/ghi trực tiếp từ client, giữ đúng nguyên tắc của bản gốc
-// (Code.gs): server luôn xác thực PIN + tự tính lại số liệu, client không bao giờ
-// được tin. Mọi đọc/ghi phải đi qua Cloud Functions (dùng Admin SDK, bỏ qua rules này).
+// Không có backend nào ở giữa — mọi truy cập đi thẳng từ client, nên toàn bộ
+// việc "xác thực" phải diễn ra ngay trong rules này (chạy trên server Google,
+// client không đọc được logic hay giá trị PIN thật).
+//
+// Cơ chế PIN-gate không cần backend:
+//   - PIN thật nằm ở config/pin, rule chặn đọc tuyệt đối (allow read: if false).
+//   - Client "đăng nhập" bằng cách CREATE document sessions/{uid} kèm field `pin`
+//     họ vừa nhập. Rule so khớp field đó với config/pin NGAY TRONG ĐIỀU KIỆN GHI —
+//     việc so sánh diễn ra phía server, client chỉ nhận biết ghi thành công (đúng
+//     PIN) hay bị từ chối (sai PIN), không bao giờ thấy giá trị PIN thật.
+//   - Các collection dữ liệu chỉ cho đọc/ghi nếu tồn tại session hợp lệ ứng với
+//     uid hiện tại (uid đến từ Firebase Anonymous Auth, ổn định theo thiết bị/trình duyệt).
+//
+// Đánh đổi đã biết trước (không có server để tự tính lại/khoá giao dịch như
+// Code.gs bản gốc): bất kỳ ai đã "unlock" (biết đúng PIN) đều có thể ghi trực
+// tiếp expenses/expenseShares/settlements — rules chỉ kiểm tra được cấu trúc dữ
+// liệu cơ bản, không tái tính toán để phát hiện gian lận. Chấp nhận đánh đổi này
+// đổi lấy việc không cần backend.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if false;
+
+    // So lại PIN đã lưu trong session với config/pin HIỆN TẠI ở mọi lần truy cập
+    // (không chỉ lúc đăng nhập) - giống Code.gs bản gốc gọi getRequiredPin() lại
+    // ở mọi request ghi dữ liệu. Nhờ vậy đổi PIN sẽ tự "đăng xuất" mọi thiết bị
+    // ngay lập tức, không cần cơ chế hết hạn/thu hồi session riêng.
+    function isUnlocked() {
+      return request.auth != null &&
+        exists(/databases/$(database)/documents/sessions/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/sessions/$(request.auth.uid)).data.pin ==
+          get(/databases/$(database)/documents/config/pin).data.value;
+    }
+
+    // ===== Xác thực PIN =====
+    match /config/pin {
+      allow read: if false;
+      allow write: if false; // sửa PIN qua Firebase Console (Admin SDK, bỏ qua rules)
+    }
+
+    match /sessions/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      // "Đăng nhập": tạo session mới, chỉ thành công nếu field pin gửi lên khớp
+      // config/pin thật. Không cho update (PIN không đổi qua đường này).
+      allow create: if request.auth != null && request.auth.uid == uid &&
+        request.resource.data.pin == get(/databases/$(database)/documents/config/pin).data.value;
+      allow update: if false;
+      // "Đăng xuất": tự xoá session của chính mình.
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ===== Danh mục (thành viên, gợi ý nội dung) — chỉ đọc từ client =====
+    // Sửa danh sách thành viên / ngân hàng / STK làm trực tiếp trên Firebase
+    // Console (Firestore Data tab), giống thao tác sửa Google Sheet trước đây.
+    match /members/{memberId} {
+      allow read: if isUnlocked();
+      allow write: if false;
+    }
+
+    match /config/suggestions {
+      allow read: if isUnlocked();
+      allow write: if false;
+    }
+
+    // ===== Dữ liệu chi tiêu =====
+    match /expenses/{expenseId} {
+      allow read: if isUnlocked();
+      allow create: if isUnlocked() &&
+        request.resource.data.keys().hasAll(
+          ['ngayChi', 'noiDung', 'soTien', 'nguoiChi', 'phuongThucChia', 'thoiGianNhap', 'idKy']
+        ) &&
+        request.resource.data.soTien is number && request.resource.data.soTien > 0;
+      // Chỉ cho phép sửa duy nhất field idKy (đánh dấu đã chốt sổ) - không cho
+      // sửa số tiền/nội dung của khoản chi đã tạo.
+      allow update: if isUnlocked() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['idKy']);
+      allow delete: if false;
+    }
+
+    match /expenseShares/{shareId} {
+      allow read: if isUnlocked();
+      allow create: if isUnlocked() &&
+        request.resource.data.keys().hasAll(
+          ['expenseId', 'ngayChi', 'nguoiChi', 'nguoiThamGia', 'soTien', 'idKy']
+        );
+      allow update: if isUnlocked() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['idKy']);
+      allow delete: if false;
+    }
+
+    // ===== Lịch sử chốt sổ =====
+    match /settlements/{kyId} {
+      allow read: if isUnlocked();
+      allow create: if isUnlocked();
+      // Cho update để hỗ trợ "đánh dấu đã thanh toán" (sửa field transactions).
+      allow update: if isUnlocked() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['transactions']);
+      allow delete: if false;
     }
   }
 }

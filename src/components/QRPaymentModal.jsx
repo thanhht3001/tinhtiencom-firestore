@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { APPS_SCRIPT_URL } from "../config";
-import { PIN_STORAGE_KEY } from "./PinGate";
+import { markTransactionPaid } from "../lib/firestoreApi";
 import "./QRPaymentModal.css";
 
 const formatVnd = (value) => Number(value || 0).toLocaleString("vi-VN") + " đ";
@@ -15,7 +14,7 @@ function buildVietQrUrl({ bin, stk, soTien, addInfo, accountName }) {
 }
 
 // Modal hiện mã QR VietQR cho 1 giao dịch gợi ý chuyển khoản (chỉ dùng ở màn Lịch sử chốt sổ).
-// "Đóng" chỉ tắt modal, không đổi trạng thái. "Đã thanh toán" gọi action danhDauThanhToan.
+// "Đóng" chỉ tắt modal, không đổi trạng thái. "Đã thanh toán" ghi vào settlements/{kyId}.
 export default function QRPaymentModal({ tu, den, soTien, kyId, index, bin, stk, thanhVienList, onClose, onConfirmed }) {
   const [nguoiDanhDau, setNguoiDanhDau] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -33,15 +32,8 @@ export default function QRPaymentModal({ tu, den, soTien, kyId, index, bin, stk,
     setError("");
     setSubmitting(true);
     try {
-      const pin = localStorage.getItem(PIN_STORAGE_KEY) || "";
-      const res = await fetch(APPS_SCRIPT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ action: "danhDauThanhToan", pin, kyId, index, nguoiDanhDau }),
-      });
-      const data = await res.json();
-      if (data.result !== "success") throw new Error(data.error || "Lỗi không xác định");
-      onConfirmed(data.transactions);
+      const transactions = await markTransactionPaid({ kyId, index, nguoiDanhDau });
+      onConfirmed(transactions);
     } catch (err) {
       setError(err.message);
     } finally {

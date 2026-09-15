@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { APPS_SCRIPT_URL } from "../config";
+import { createExpense } from "../lib/firestoreApi";
 import Combobox from "./Combobox";
 import "./ExpenseForm.css";
 
@@ -15,12 +15,11 @@ export default function ExpenseForm({ thanhVienList, danhMucNoiDung, onPinReject
   const [thamGia, setThamGia] = useState([]);
   const [phuongThuc, setPhuongThuc] = useState("deu");
   const [splitAmounts, setSplitAmounts] = useState({});
-  const [pin, setPin] = useState(() => localStorage.getItem("tinhtiencom_pin") || "");
 
-  // ID sinh sẵn cho lần gửi tiếp theo — giữ nguyên xuyên suốt các lần gửi lại khi lỗi,
-  // chỉ đổi sang ID mới sau khi gửi thành công (resetForm). Nhờ vậy nếu request trước
-  // thực ra đã lưu thành công (chỉ lỗi ở phản hồi) thì server nhận diện trùng ID và
-  // không ghi thêm dòng khi người dùng bấm gửi lại.
+  // ID sinh sẵn cho lần gửi tiếp theo — giữ nguyên xuyên suốt các lần gửi lại khi
+  // lỗi mạng, chỉ đổi sang ID mới sau khi gửi thành công (resetForm). Ghi Firestore
+  // với cùng id + cùng nội dung là thao tác ghi đè vô hại (idempotent), nên gửi
+  // lại không bao giờ tạo trùng khoản chi.
   const [submissionId, setSubmissionId] = useState(() => crypto.randomUUID());
 
   const [submitting, setSubmitting] = useState(false);
@@ -85,52 +84,23 @@ export default function ExpenseForm({ thanhVienList, danhMucNoiDung, onPinReject
       return;
     }
 
-    const payload = {
-      id: submissionId,
-      pin,
-      ngayChi,
-      noiDung: noiDung.trim(),
-      soTien: soTienNumber,
-      nguoiChi,
-      phuongThucChia: phuongThuc === "deu" ? "Chia đều" : "Tự nhập",
-      chiTiet: buildChiTiet(),
-      userAgent: navigator.userAgent,
-    };
-
     setSubmitting(true);
     try {
-      const res = await fetch(APPS_SCRIPT_URL, {
-        method: "POST",
-        // text/plain để tránh CORS preflight với Apps Script Web App
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(payload),
+      await createExpense({
+        id: submissionId,
+        ngayChi,
+        noiDung: noiDung.trim(),
+        soTien: soTienNumber,
+        nguoiChi,
+        phuongThucChia: phuongThuc === "deu" ? "Chia đều" : "Tự nhập",
+        chiTiet: buildChiTiet(),
+        userAgent: navigator.userAgent,
       });
-
-      // Apps Script Web App thỉnh thoảng trả về trang lỗi HTML thay vì JSON ở bước
-      // redirect nội bộ của Google, dù request đã ghi vào sheet thành công. Giữ
-      // nguyên submissionId (không resetForm) để lần gửi lại được server nhận diện
-      // trùng ID và không ghi thêm dòng.
-      let data;
-      try {
-        data = await res.json();
-      } catch {
-        setStatus({
-          type: "error",
-          message:
-            "Mất kết nối khi nhận phản hồi từ server. Khoản chi có thể đã được lưu — vui lòng bấm Gửi lại để xác nhận (sẽ không bị trùng).",
-        });
-        return;
-      }
-
-      if (data.result !== "success") throw new Error(data.error || "Lỗi không xác định");
-      setStatus({
-        type: "success",
-        message: data.daTonTai ? "Khoản chi này đã được ghi nhận trước đó." : "Đã lưu thành công!",
-      });
+      setStatus({ type: "success", message: "Đã lưu thành công!" });
       resetForm();
     } catch (err) {
       setStatus({ type: "error", message: "Gửi thất bại: " + err.message });
-      if (err.message.indexOf("PIN") !== -1) onPinRejected?.();
+      if (err.code === "permission-denied") onPinRejected?.();
     } finally {
       setSubmitting(false);
     }

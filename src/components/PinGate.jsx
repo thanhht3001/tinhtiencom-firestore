@@ -1,8 +1,6 @@
 import { useState } from "react";
-import { APPS_SCRIPT_URL } from "../config";
+import { unlockWithPin } from "../lib/session";
 import "./PinGate.css";
-
-export const PIN_STORAGE_KEY = "tinhtiencom_pin";
 
 export default function PinGate({ onUnlock }) {
   const [pin, setPin] = useState("");
@@ -14,17 +12,10 @@ export default function PinGate({ onUnlock }) {
     setError("");
     setSubmitting(true);
     try {
-      const res = await fetch(APPS_SCRIPT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ action: "verifyPin", pin }),
-      });
-      const data = await res.json();
-      if (data.result !== "success") throw new Error(data.error || "Mã PIN không đúng");
-      localStorage.setItem(PIN_STORAGE_KEY, pin);
-      onUnlock(pin);
-    } catch (err) {
-      setError(err.message);
+      await unlockWithPin(pin);
+      onUnlock();
+    } catch {
+      setError("Mã PIN không chính xác");
     } finally {
       setSubmitting(false);
     }
