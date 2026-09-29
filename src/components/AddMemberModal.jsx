@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createMember } from "../lib/firestoreApi";
+import { BANKS } from "../lib/banks";
 import "./QRPaymentModal.css";
 
 // Popup thêm người dùng mới. Lưu xong gọi onSaved() để cha tải lại danh sách.
@@ -7,7 +8,6 @@ export default function AddMemberModal({ existingNames, onClose, onSaved }) {
   const [ten, setTen] = useState("");
   const [nganHang, setNganHang] = useState("");
   const [stk, setStk] = useState("");
-  const [bin, setBin] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -19,14 +19,14 @@ export default function AddMemberModal({ existingNames, onClose, onSaved }) {
     if (existingNames.some((n) => n.toLowerCase() === name.toLowerCase())) {
       return setError("Tên này đã tồn tại.");
     }
-    const bankFilled = [nganHang, stk, bin].filter((v) => v.trim()).length;
-    if (bankFilled > 0 && bankFilled < 3) {
-      return setError("Thông tin ngân hàng cần nhập đủ 3 ô (hoặc để trống cả 3).");
+    if (!!nganHang !== !!stk.trim()) {
+      return setError("Cần chọn ngân hàng và nhập số tài khoản cùng lúc (hoặc để trống cả hai).");
     }
+    const bank = BANKS.find((b) => b.ten === nganHang);
 
     setSubmitting(true);
     try {
-      await createMember({ ten: name, nganHang: nganHang.trim(), stk: stk.trim(), bin: bin.trim() });
+      await createMember({ ten: name, nganHang: bank?.ten, stk: stk.trim(), bin: bank?.bin });
       await onSaved();
     } catch (err) {
       setError("Lưu thất bại: " + err.message);
@@ -47,15 +47,18 @@ export default function AddMemberModal({ existingNames, onClose, onSaved }) {
         </div>
         <div className="field">
           <label htmlFor="memNganHang">Ngân hàng (tuỳ chọn)</label>
-          <input type="text" id="memNganHang" value={nganHang} onChange={(e) => setNganHang(e.target.value)} />
+          <select id="memNganHang" value={nganHang} onChange={(e) => setNganHang(e.target.value)}>
+            <option value="">-- Chọn ngân hàng --</option>
+            {BANKS.map((b) => (
+              <option key={b.bin} value={b.ten}>
+                {b.ten}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="field">
           <label htmlFor="memStk">Số tài khoản (tuỳ chọn)</label>
           <input type="text" id="memStk" inputMode="numeric" value={stk} onChange={(e) => setStk(e.target.value)} />
-        </div>
-        <div className="field">
-          <label htmlFor="memBin">Mã BIN ngân hàng (tuỳ chọn)</label>
-          <input type="text" id="memBin" inputMode="numeric" value={bin} onChange={(e) => setBin(e.target.value)} />
         </div>
 
         {error && <p className="hint error-text">{error}</p>}
