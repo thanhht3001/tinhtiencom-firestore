@@ -43,3 +43,9 @@
 .qr-modal-actions button {
   flex: 1;
 }
+
+.qr-modal-actions .submit-btn,
+.qr-modal-actions .cancel-btn {
+  margin-top: 0;
+  font-family: inherit;
+}
