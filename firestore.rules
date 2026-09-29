@@ -52,9 +52,16 @@ service cloud.firestore {
     // ===== Danh mục (thành viên, gợi ý nội dung) — chỉ đọc từ client =====
     // Sửa danh sách thành viên / ngân hàng / STK làm trực tiếp trên Firebase
     // Console (Firestore Data tab), giống thao tác sửa Google Sheet trước đây.
+    // Riêng members cho phép THÊM MỚI (create) từ popup "Thêm người" ở tab Kê khai
+    // chi tiêu; sửa/xoá vẫn chỉ làm trên Console.
     match /members/{memberId} {
       allow read: if isUnlocked();
-      allow write: if false;
+      allow create: if isUnlocked() &&
+        request.resource.data.ten is string &&
+        request.resource.data.ten.size() > 0 &&
+        request.resource.data.ten.size() <= 50 &&
+        request.resource.data.keys().hasOnly(['ten', 'nganHang', 'stk', 'bin']);
+      allow update, delete: if false;
     }
 
     match /config/suggestions {

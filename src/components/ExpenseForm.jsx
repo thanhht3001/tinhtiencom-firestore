@@ -1,13 +1,15 @@
 import { useMemo, useState } from "react";
 import { createExpense } from "../lib/firestoreApi";
 import Combobox from "./Combobox";
+import AddMemberModal from "./AddMemberModal";
 import "./ExpenseForm.css";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
 const formatVnd = (value) => Number(value || 0).toLocaleString("vi-VN") + " đ";
 
-export default function ExpenseForm({ thanhVienList, danhMucNoiDung, onPinRejected }) {
+export default function ExpenseForm({ thanhVienList, danhMucNoiDung, onPinRejected, onMembersChanged }) {
+  const [showAddMember, setShowAddMember] = useState(false);
   const [ngayChi, setNgayChi] = useState(today());
   const [noiDung, setNoiDung] = useState("");
   const [soTien, setSoTien] = useState("");
@@ -184,6 +186,14 @@ export default function ExpenseForm({ thanhVienList, danhMucNoiDung, onPinReject
               </button>
             );
           })}
+          <button
+            type="button"
+            className="pill pill-add"
+            onClick={() => setShowAddMember(true)}
+            title="Thêm người dùng"
+          >
+            + Thêm người
+          </button>
           {!dataReady && <span className="hint">Chưa có thành viên nào.</span>}
         </div>
       </div>
@@ -238,6 +248,16 @@ export default function ExpenseForm({ thanhVienList, danhMucNoiDung, onPinReject
       </button>
 
       {status && <p className={`status status-${status.type}`}>{status.message}</p>}
+      {showAddMember && (
+        <AddMemberModal
+          existingNames={thanhVienList}
+          onClose={() => setShowAddMember(false)}
+          onSaved={async () => {
+            await onMembersChanged?.();
+            setShowAddMember(false);
+          }}
+        />
+      )}
     </form>
   );
 }

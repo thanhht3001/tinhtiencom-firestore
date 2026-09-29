@@ -3,6 +3,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  setDoc,
   query,
   where,
   orderBy,
@@ -156,4 +157,12 @@ export async function markTransactionPaid({ kyId, index, nguoiDanhDau }) {
     tx.update(ref, { transactions });
     return transactions;
   });
+}
+
+// Thêm thành viên mới (popup "Thêm người" ở tab Kê khai chi tiêu). Doc id = id
+// ngẫu nhiên; ngân hàng/STK/BIN là tuỳ chọn (không có thì không hiện QR cho người này).
+export async function createMember({ ten, nganHang, stk, bin }) {
+  const data = { ten };
+  if (nganHang && stk && bin) Object.assign(data, { nganHang, stk, bin });
+  await setDoc(doc(db, "members", crypto.randomUUID()), data);
 }

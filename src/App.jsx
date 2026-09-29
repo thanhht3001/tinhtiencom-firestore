@@ -32,24 +32,20 @@ function App() {
       .finally(() => setAuthChecked(true));
   }, []);
 
+  async function loadSharedData() {
+    const [{ names, bankInfo }, danhMucNoiDung] = await Promise.all([
+      fetchMembersAndBankInfo(),
+      fetchSuggestions(),
+    ]);
+    setSharedData({ thanhVienList: names, bankInfo, danhMucNoiDung });
+    setSharedDataError("");
+  }
+
   useEffect(() => {
     if (!unlocked) return;
-    let cancelled = false;
-
-    Promise.all([fetchMembersAndBankInfo(), fetchSuggestions()])
-      .then(([{ names, bankInfo }, danhMucNoiDung]) => {
-        if (cancelled) return;
-        setSharedData({ thanhVienList: names, bankInfo, danhMucNoiDung });
-        setSharedDataError("");
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setSharedDataError("Không tải được dữ liệu: " + err.message);
-      });
-
-    return () => {
-      cancelled = true;
-    };
+    loadSharedData().catch((err) => {
+      setSharedDataError("Không tải được dữ liệu: " + err.message);
+    });
   }, [unlocked]);
 
   async function handleLock() {
@@ -105,6 +101,7 @@ function App() {
                     thanhVienList={sharedData.thanhVienList}
                     danhMucNoiDung={sharedData.danhMucNoiDung}
                     onPinRejected={handleLock}
+                    onMembersChanged={loadSharedData}
                   />
                 )}
                 {tab === "chotSo" && (

@@ -191,3 +191,8 @@
   color: var(--color-error);
   background: var(--color-error-bg);
 }
+
+.pill-add {
+  border-style: dashed;
+  color: var(--color-primary);
+}
