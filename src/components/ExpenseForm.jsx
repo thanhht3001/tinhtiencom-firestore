@@ -111,6 +111,7 @@ export default function ExpenseForm({ thanhVienList, danhMucNoiDung, onPinReject
   const dataReady = thanhVienList.length > 0;
 
   return (
+    <>
     <form className="expense-form" onSubmit={handleSubmit}>
       <div className="field">
         <label htmlFor="ngayChi">Ngày chi</label>
@@ -248,6 +249,7 @@ export default function ExpenseForm({ thanhVienList, danhMucNoiDung, onPinReject
       </button>
 
       {status && <p className={`status status-${status.type}`}>{status.message}</p>}
+    </form>
       {showAddMember && (
         <AddMemberModal
           existingNames={thanhVienList}
@@ -258,6 +260,6 @@ export default function ExpenseForm({ thanhVienList, danhMucNoiDung, onPinReject
           }}
         />
       )}
-    </form>
+    </>
   );
 }
