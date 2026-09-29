@@ -168,3 +168,30 @@
   background: var(--color-primary);
   color: #fff;
 }
+
+.settlement-table td,
+.settlement-table th {
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .settlement-table {
+    font-size: 0.78rem;
+  }
+
+  .settlement-table th,
+  .settlement-table td {
+    padding: 8px 4px;
+  }
+}
+
+@media (max-width: 360px) {
+  .settlement-table {
+    font-size: 0.7rem;
+  }
+
+  .settlement-table th,
+  .settlement-table td {
+    padding: 8px 2px;
+  }
+}
