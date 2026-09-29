@@ -43,19 +43,19 @@ export default function AddMemberModal({ existingNames, onClose, onSaved }) {
 
         <div className="field">
           <label htmlFor="memTen">Tên</label>
-          <input id="memTen" value={ten} onChange={(e) => setTen(e.target.value)} autoFocus required />
+          <input type="text" id="memTen" value={ten} onChange={(e) => setTen(e.target.value)} autoFocus required />
         </div>
         <div className="field">
           <label htmlFor="memNganHang">Ngân hàng (tuỳ chọn)</label>
-          <input id="memNganHang" value={nganHang} onChange={(e) => setNganHang(e.target.value)} />
+          <input type="text" id="memNganHang" value={nganHang} onChange={(e) => setNganHang(e.target.value)} />
         </div>
         <div className="field">
           <label htmlFor="memStk">Số tài khoản (tuỳ chọn)</label>
-          <input id="memStk" inputMode="numeric" value={stk} onChange={(e) => setStk(e.target.value)} />
+          <input type="text" id="memStk" type="text" inputMode="numeric" value={stk} onChange={(e) => setStk(e.target.value)} />
         </div>
         <div className="field">
           <label htmlFor="memBin">Mã BIN ngân hàng (tuỳ chọn)</label>
-          <input id="memBin" inputMode="numeric" value={bin} onChange={(e) => setBin(e.target.value)} />
+          <input type="text" id="memBin" type="text" inputMode="numeric" value={bin} onChange={(e) => setBin(e.target.value)} />
         </div>
 
         {error && <p className="hint error-text">{error}</p>}
