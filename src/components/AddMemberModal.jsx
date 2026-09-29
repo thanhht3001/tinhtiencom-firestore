@@ -51,11 +51,11 @@ export default function AddMemberModal({ existingNames, onClose, onSaved }) {
         </div>
         <div className="field">
           <label htmlFor="memStk">Số tài khoản (tuỳ chọn)</label>
-          <input type="text" id="memStk" type="text" inputMode="numeric" value={stk} onChange={(e) => setStk(e.target.value)} />
+          <input type="text" id="memStk" inputMode="numeric" value={stk} onChange={(e) => setStk(e.target.value)} />
         </div>
         <div className="field">
           <label htmlFor="memBin">Mã BIN ngân hàng (tuỳ chọn)</label>
-          <input type="text" id="memBin" type="text" inputMode="numeric" value={bin} onChange={(e) => setBin(e.target.value)} />
+          <input type="text" id="memBin" inputMode="numeric" value={bin} onChange={(e) => setBin(e.target.value)} />
         </div>
 
         {error && <p className="hint error-text">{error}</p>}
