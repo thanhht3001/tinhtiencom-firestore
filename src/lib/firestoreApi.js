@@ -7,6 +7,7 @@ import {
   query,
   where,
   orderBy,
+  onSnapshot,
   writeBatch,
   runTransaction,
   serverTimestamp,
@@ -81,6 +82,54 @@ async function fetchOpenExpensesAndShares() {
   return {
     expenses: expSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
     shares: shareSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
+  };
+}
+
+// Theo dõi realtime các khoản chi chưa chốt (idKy rỗng) kèm danh sách người tham
+// gia, sắp xếp mới nhập trước. Trả về hàm huỷ theo dõi. Sắp xếp phía client thay
+// vì orderBy để khỏi cần composite index (idKy + thoiGianNhap); số khoản trong 1
+// kỳ nhỏ nên không đáng kể. serverTimestamps: "estimate" để khoản vừa gửi (đang
+// chờ server gán thoiGianNhap) vẫn có thời gian và nằm đầu danh sách ngay.
+export function subscribeOpenExpenses(onData, onError) {
+  let expenses = null;
+  let shares = null;
+
+  function emit() {
+    if (!expenses || !shares) return;
+    const thamGiaById = {};
+    shares.forEach((s) => {
+      if (!thamGiaById[s.expenseId]) thamGiaById[s.expenseId] = [];
+      thamGiaById[s.expenseId].push({ nguoi: s.nguoiThamGia, soTien: s.soTien });
+    });
+    const list = expenses.map((e) => ({
+      ...e,
+      thoiGianNhapMs: e.thoiGianNhap?.toMillis?.() ?? 0,
+      thamGia: thamGiaById[e.id] || [],
+    }));
+    list.sort((a, b) => b.thoiGianNhapMs - a.thoiGianNhapMs);
+    onData(list);
+  }
+
+  const unsubExpenses = onSnapshot(
+    query(collection(db, "expenses"), where("idKy", "==", "")),
+    (snap) => {
+      expenses = snap.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) }));
+      emit();
+    },
+    onError
+  );
+  const unsubShares = onSnapshot(
+    query(collection(db, "expenseShares"), where("idKy", "==", "")),
+    (snap) => {
+      shares = snap.docs.map((d) => d.data());
+      emit();
+    },
+    onError
+  );
+
+  return () => {
+    unsubExpenses();
+    unsubShares();
   };
 }
 

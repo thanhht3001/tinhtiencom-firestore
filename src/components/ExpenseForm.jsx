@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { createExpense } from "../lib/firestoreApi";
 import Combobox from "./Combobox";
 import AddMemberModal from "./AddMemberModal";
+import ChiTieuChuaChot from "./ChiTieuChuaChot";
 import "./ExpenseForm.css";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -250,6 +251,7 @@ export default function ExpenseForm({ thanhVienList, danhMucNoiDung, onPinReject
 
       {status && <p className={`status status-${status.type}`}>{status.message}</p>}
     </form>
+      <ChiTieuChuaChot onPinRejected={onPinRejected} />
       {showAddMember && (
         <AddMemberModal
           existingNames={thanhVienList}
