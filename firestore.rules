@@ -99,10 +99,14 @@ service cloud.firestore {
     match /settlements/{kyId} {
       allow read: if isUnlocked();
       allow create: if isUnlocked();
-      // Cho update để hỗ trợ "đánh dấu đã thanh toán" (sửa field transactions).
+      // Cho update để hỗ trợ "đánh dấu đã thanh toán" (sửa field transactions +
+      // bật cờ coThanhToan). Cờ chỉ được bật, không được tắt.
       allow update: if isUnlocked() &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['transactions']);
-      allow delete: if false;
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['transactions', 'coThanhToan']) &&
+        request.resource.data.get('coThanhToan', false) == true;
+      // Cho xoá để hỗ trợ "huỷ chốt sổ" khi chốt nhầm (client trả idKy của các
+      // khoản chi về "" trong cùng transaction) — chỉ khi chưa ai thanh toán.
+      allow delete: if isUnlocked() && resource.data.get('coThanhToan', false) == false;
     }
   }
 }

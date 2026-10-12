@@ -190,6 +190,31 @@ export async function fetchSettlementHistory() {
   return snap.docs.map((d) => d.data());
 }
 
+// Huỷ chốt sổ (khi chốt nhầm): trả các khoản chi + phần chia của kỳ về trạng thái
+// chưa chốt (idKy = "") rồi xoá settlements/{kyId}, tất cả trong 1 transaction.
+// Các khoản chi sẽ quay lại danh sách đang mở như trước khi chốt.
+export async function revertSettlement(kyId) {
+  const [expSnap, shareSnap] = await Promise.all([
+    getDocs(query(collection(db, "expenses"), where("idKy", "==", kyId))),
+    getDocs(query(collection(db, "expenseShares"), where("idKy", "==", kyId))),
+  ]);
+
+  await runTransaction(db, async (tx) => {
+    const ref = doc(db, "settlements", kyId);
+    const snap = await tx.get(ref);
+    if (!snap.exists()) throw new Error("Không tìm thấy kỳ chốt sổ (có thể đã được huỷ).");
+    // Kiểm tra lại ngay trong transaction: nếu có người vừa đánh dấu đã thanh toán
+    // xen giữa thì transaction retry và bị chặn ở đây.
+    if ((snap.data().transactions || []).some((t) => t.daThanhToan)) {
+      throw new Error("Kỳ này đã có người thanh toán, không thể huỷ chốt.");
+    }
+
+    expSnap.docs.forEach((d) => tx.update(d.ref, { idKy: "" }));
+    shareSnap.docs.forEach((d) => tx.update(d.ref, { idKy: "" }));
+    tx.delete(ref);
+  });
+}
+
 export async function markTransactionPaid({ kyId, index, nguoiDanhDau }) {
   return runTransaction(db, async (tx) => {
     const ref = doc(db, "settlements", kyId);
@@ -203,7 +228,9 @@ export async function markTransactionPaid({ kyId, index, nguoiDanhDau }) {
       nguoiDanhDau,
       thoiGianDanhDau: new Date().toISOString(),
     };
-    tx.update(ref, { transactions });
+    // coThanhToan: cờ để Firestore Rules chặn huỷ chốt kỳ đã có người thanh toán
+    // (rules không duyệt được từng phần tử trong mảng transactions).
+    tx.update(ref, { transactions, coThanhToan: true });
     return transactions;
   });
 }
