@@ -45,7 +45,16 @@ export default function LichSuChot({ thanhVienList, bankInfo, onPinRejected }) {
     setReverting(true);
     try {
       // Xác nhận lại PIN trước khi huỷ chốt, giống bước xác nhận khi chốt sổ.
-      await unlockWithPin(revertPin);
+      // Tách riêng để phân biệt sai PIN với lỗi quyền khi huỷ chốt (vd rules chưa deploy).
+      try {
+        await unlockWithPin(revertPin);
+      } catch (err) {
+        if (err.code === "permission-denied") {
+          setStatus({ type: "error", message: "Mã PIN xác nhận không đúng." });
+          return;
+        }
+        throw err;
+      }
       await revertSettlement(kyId);
       setKyList((list) => list.filter((ky) => ky.kyId !== kyId));
       setRevertKyId(null);
@@ -55,10 +64,12 @@ export default function LichSuChot({ thanhVienList, bankInfo, onPinRejected }) {
         message: `Đã huỷ chốt kỳ ${kyId}. Các khoản chi đã trở về trạng thái chưa chốt.`,
       });
     } catch (err) {
-      const wrongPin = err.code === "permission-denied";
+      const denied = err.code === "permission-denied";
       setStatus({
         type: "error",
-        message: wrongPin ? "Mã PIN xác nhận không đúng." : "Huỷ chốt thất bại: " + err.message,
+        message: denied
+          ? "Huỷ chốt bị Firestore từ chối (rules chưa cho phép hoặc kỳ đã có người thanh toán)."
+          : "Huỷ chốt thất bại: " + err.message,
       });
     } finally {
       setReverting(false);
