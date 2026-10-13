@@ -33,11 +33,11 @@ function App() {
   }, []);
 
   async function loadSharedData() {
-    const [{ names, bankInfo }, danhMucNoiDung] = await Promise.all([
+    const [{ names, members, bankInfo }, danhMucNoiDung] = await Promise.all([
       fetchMembersAndBankInfo(),
       fetchSuggestions(),
     ]);
-    setSharedData({ thanhVienList: names, bankInfo, danhMucNoiDung });
+    setSharedData({ thanhVienList: names, members, bankInfo, danhMucNoiDung });
     setSharedDataError("");
   }
 
@@ -99,6 +99,7 @@ function App() {
                 {tab === "chiTieu" && (
                   <ExpenseForm
                     thanhVienList={sharedData.thanhVienList}
+                    members={sharedData.members}
                     danhMucNoiDung={sharedData.danhMucNoiDung}
                     onPinRejected={handleLock}
                     onMembersChanged={loadSharedData}

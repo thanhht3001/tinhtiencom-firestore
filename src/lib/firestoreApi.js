@@ -15,19 +15,24 @@ import {
 import { db } from "../firebase";
 import { computeSettlement } from "./settlement";
 
+// names: chỉ người đang hoạt động (dùng cho các danh sách chọn); members: tất cả
+// kèm cờ hoatDong (popup quản lý); bankInfo: tất cả (QR ở lịch sử vẫn cần).
 export async function fetchMembersAndBankInfo() {
   const snap = await getDocs(collection(db, "members"));
   const names = [];
+  const members = [];
   const bankInfo = {};
   snap.forEach((d) => {
     const data = d.data();
     if (!data.ten) return;
-    names.push(data.ten);
+    const hoatDong = data.hoatDong !== false;
+    members.push({ ten: data.ten, hoatDong });
+    if (hoatDong) names.push(data.ten);
     if (data.nganHang && data.stk && data.bin) {
       bankInfo[data.ten] = { nganHang: data.nganHang, stk: data.stk, bin: data.bin };
     }
   });
-  return { names, bankInfo };
+  return { names, members, bankInfo };
 }
 
 export async function fetchSuggestions() {
@@ -269,17 +274,20 @@ export async function findUnpaidForMember(ten) {
   return reasons;
 }
 
-// Xoá thành viên (popup "Quản lý người dùng"). Chỉ cho xoá khi người đó không còn
-// khoản tiền nào chưa thanh toán; dữ liệu lịch sử vẫn giữ nguyên tên người đã xoá.
-export async function deleteMember(ten) {
-  const reasons = await findUnpaidForMember(ten);
-  if (reasons.length > 0) {
-    const err = new Error(`Không thể xoá "${ten}" vì còn: ${reasons.join("; ")}.`);
-    err.code = "has-unpaid";
-    throw err;
+// Bật/tắt thành viên (popup "Quản lý người dùng"). Người bị tắt (hoatDong = false)
+// không hiện trong các danh sách chọn nữa nhưng vẫn giữ nguyên dữ liệu/STK cho
+// lịch sử. Chỉ cho tắt khi người đó không còn khoản tiền nào chưa thanh toán.
+export async function setMemberActive(ten, hoatDong) {
+  if (!hoatDong) {
+    const reasons = await findUnpaidForMember(ten);
+    if (reasons.length > 0) {
+      const err = new Error(`Không thể tắt "${ten}" vì còn: ${reasons.join("; ")}.`);
+      err.code = "has-unpaid";
+      throw err;
+    }
   }
   const snap = await getDocs(query(collection(db, "members"), where("ten", "==", ten)));
   const batch = writeBatch(db);
-  snap.docs.forEach((d) => batch.delete(d.ref));
+  snap.docs.forEach((d) => batch.update(d.ref, { hoatDong }));
   await batch.commit();
 }

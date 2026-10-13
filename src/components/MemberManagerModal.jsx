@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { createMember, deleteMember } from "../lib/firestoreApi";
+import { createMember, setMemberActive } from "../lib/firestoreApi";
 import { BANKS } from "../lib/banks";
 import "./QRPaymentModal.css";
 import "./MemberManagerModal.css";
 
-// Popup quản lý người dùng: tab "Thêm người" và tab "Danh sách" (xoá người).
+// Popup quản lý người dùng: tab "Thêm người" và tab "Danh sách" (bật/tắt người).
 // Thay đổi xong gọi onChanged() để cha tải lại danh sách.
-export default function MemberManagerModal({ existingNames, onClose, onChanged }) {
+export default function MemberManagerModal({ members, onClose, onChanged }) {
   const [tab, setTab] = useState("them");
 
   return (
@@ -28,14 +28,14 @@ export default function MemberManagerModal({ existingNames, onClose, onChanged }
             className={`tab${tab === "danhSach" ? " tab-active" : ""}`}
             onClick={() => setTab("danhSach")}
           >
-            Danh sách ({existingNames.length})
+            Danh sách ({members.length})
           </button>
         </nav>
 
         {tab === "them" ? (
-          <AddMemberTab existingNames={existingNames} onClose={onClose} onSaved={onChanged} />
+          <AddMemberTab existingNames={members.map((m) => m.ten)} onClose={onClose} onSaved={onChanged} />
         ) : (
-          <MemberListTab names={existingNames} onClose={onClose} onDeleted={onChanged} />
+          <MemberListTab members={members} onClose={onClose} onToggled={onChanged} />
         )}
       </div>
     </div>
@@ -116,82 +116,62 @@ function AddMemberTab({ existingNames, onClose, onSaved }) {
   );
 }
 
-function MemberListTab({ names, onClose, onDeleted }) {
-  // confirming: tên đang chờ xác nhận xoá; deleting: tên đang gọi API xoá.
-  const [confirming, setConfirming] = useState(null);
-  const [deleting, setDeleting] = useState(null);
+function MemberListTab({ members, onClose, onToggled }) {
+  // pending: tên đang gọi API bật/tắt.
+  const [pending, setPending] = useState(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  async function handleDelete(ten) {
+  async function handleToggle(ten, hoatDong) {
     setError("");
     setSuccess("");
-    setDeleting(ten);
+    setPending(ten);
     try {
-      await deleteMember(ten);
-      await onDeleted();
-      setSuccess(`Đã xoá "${ten}".`);
+      await setMemberActive(ten, hoatDong);
+      await onToggled();
+      setSuccess(hoatDong ? `Đã bật "${ten}".` : `Đã tắt "${ten}".`);
     } catch (err) {
-      setError(err.code === "has-unpaid" ? err.message : "Xoá thất bại: " + err.message);
+      setError(err.code === "has-unpaid" ? err.message : "Cập nhật thất bại: " + err.message);
     } finally {
-      setDeleting(null);
-      setConfirming(null);
+      setPending(null);
     }
   }
 
   return (
     <div className="member-tab-body">
-      <p className="hint">Chỉ xoá được người không còn khoản chi chưa chốt hoặc khoản nợ chưa thanh toán.</p>
-      {names.length === 0 ? (
+      <p className="hint">
+        Người bị tắt sẽ không hiện trong các danh sách chọn. Chỉ tắt được người không còn khoản chi chưa
+        chốt hoặc khoản nợ chưa thanh toán.
+      </p>
+      {members.length === 0 ? (
         <p className="hint">Chưa có thành viên nào.</p>
       ) : (
         <ul className="member-list">
-          {names.map((ten) => (
+          {members.map(({ ten, hoatDong }) => (
             <li key={ten} className="member-row">
-              <span className="member-name">{ten}</span>
-              {confirming === ten ? (
-                <span className="member-row-actions">
-                  <button
-                    type="button"
-                    className="member-btn"
-                    onClick={() => setConfirming(null)}
-                    disabled={deleting === ten}
-                  >
-                    Huỷ
-                  </button>
-                  <button
-                    type="button"
-                    className="member-btn member-btn-danger"
-                    onClick={() => handleDelete(ten)}
-                    disabled={deleting === ten}
-                  >
-                    {deleting === ten ? "Đang kiểm tra..." : "Xác nhận xoá"}
-                  </button>
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  className="member-btn member-btn-danger"
-                  onClick={() => {
-                    setError("");
-                    setSuccess("");
-                    setConfirming(ten);
-                  }}
-                  disabled={!!deleting}
-                >
-                  Xoá
-                </button>
-              )}
+              <span className={`member-name${hoatDong ? "" : " member-name-off"}`}>{ten}</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={hoatDong}
+                aria-label={`${hoatDong ? "Tắt" : "Bật"} ${ten}`}
+                className={`member-switch${hoatDong ? " member-switch-on" : ""}`}
+                onClick={() => handleToggle(ten, !hoatDong)}
+                disabled={!!pending}
+              >
+                <span className="member-switch-knob" />
+              </button>
             </li>
           ))}
         </ul>
       )}
 
+      {pending && <p className="hint">Đang kiểm tra "{pending}"...</p>}
       {error && <p className="status status-error">{error}</p>}
       {success && <p className="status status-success">{success}</p>}
 
       <div className="qr-modal-actions">
-        <button type="button" className="cancel-btn" onClick={onClose} disabled={!!deleting}>
+        <button type="button" className="cancel-btn" onClick={onClose} disabled={!!pending}>
           Đóng
         </button>
       </div>

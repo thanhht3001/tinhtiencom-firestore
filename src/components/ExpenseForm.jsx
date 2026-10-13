@@ -9,7 +9,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 const formatVnd = (value) => Number(value || 0).toLocaleString("vi-VN") + " đ";
 
-export default function ExpenseForm({ thanhVienList, danhMucNoiDung, onPinRejected, onMembersChanged }) {
+export default function ExpenseForm({ thanhVienList, members, danhMucNoiDung, onPinRejected, onMembersChanged }) {
   const [showMembers, setShowMembers] = useState(false);
   const [ngayChi, setNgayChi] = useState(today());
   const [noiDung, setNoiDung] = useState("");
@@ -28,7 +28,7 @@ export default function ExpenseForm({ thanhVienList, danhMucNoiDung, onPinReject
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState(null); // { type: 'success' | 'error', message }
 
-  // Người vừa bị xoá ở popup "Quản lý người dùng" thì bỏ khỏi lựa chọn hiện tại.
+  // Người vừa bị tắt ở popup "Quản lý người dùng" thì bỏ khỏi lựa chọn hiện tại.
   useEffect(() => {
     setNguoiChi((prev) => (prev && !thanhVienList.includes(prev) ? "" : prev));
     setThamGia((prev) => {
@@ -263,7 +263,7 @@ export default function ExpenseForm({ thanhVienList, danhMucNoiDung, onPinReject
       <ChiTieuChuaChot onPinRejected={onPinRejected} />
       {showMembers && (
         <MemberManagerModal
-          existingNames={thanhVienList}
+          members={members}
           onClose={() => setShowMembers(false)}
           onChanged={() => onMembersChanged?.()}
         />

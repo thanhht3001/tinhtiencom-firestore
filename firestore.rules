@@ -52,10 +52,11 @@ service cloud.firestore {
     // ===== Danh mục (thành viên, gợi ý nội dung) — chỉ đọc từ client =====
     // Sửa danh sách thành viên / ngân hàng / STK làm trực tiếp trên Firebase
     // Console (Firestore Data tab), giống thao tác sửa Google Sheet trước đây.
-    // Riêng members cho phép THÊM MỚI (create) và XOÁ (delete) từ popup "Quản lý
-    // người dùng" ở tab Kê khai chi tiêu; sửa vẫn chỉ làm trên Console. Việc chặn
-    // xoá người còn khoản chưa thanh toán do client kiểm tra (rules không duyệt
-    // được expenses/settlements theo tên) — cùng đánh đổi đã nêu ở đầu file.
+    // Riêng members cho phép THÊM MỚI (create) và BẬT/TẮT (update duy nhất field
+    // hoatDong) từ popup "Quản lý người dùng" ở tab Kê khai chi tiêu; sửa khác/xoá
+    // vẫn chỉ làm trên Console. Việc chặn tắt người còn khoản chưa thanh toán do
+    // client kiểm tra (rules không duyệt được expenses/settlements theo tên) —
+    // cùng đánh đổi đã nêu ở đầu file.
     match /members/{memberId} {
       allow read: if isUnlocked();
       allow create: if isUnlocked() &&
@@ -63,8 +64,10 @@ service cloud.firestore {
         request.resource.data.ten.size() > 0 &&
         request.resource.data.ten.size() <= 50 &&
         request.resource.data.keys().hasOnly(['ten', 'nganHang', 'stk', 'bin']);
-      allow delete: if isUnlocked();
-      allow update: if false;
+      allow update: if isUnlocked() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hoatDong']) &&
+        request.resource.data.hoatDong is bool;
+      allow delete: if false;
     }
 
     match /config/suggestions {
