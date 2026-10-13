@@ -235,10 +235,51 @@ export async function markTransactionPaid({ kyId, index, nguoiDanhDau }) {
   });
 }
 
-// Thêm thành viên mới (popup "Thêm người" ở tab Kê khai chi tiêu). Doc id = id
+// Thêm thành viên mới (popup "Quản lý người dùng" ở tab Kê khai chi tiêu). Doc id = id
 // ngẫu nhiên; ngân hàng/STK/BIN là tuỳ chọn (không có thì không hiện QR cho người này).
 export async function createMember({ ten, nganHang, stk, bin }) {
   const data = { ten };
   if (nganHang && stk && bin) Object.assign(data, { nganHang, stk, bin });
   await setDoc(doc(db, "members", crypto.randomUUID()), data);
+}
+
+// Liệt kê các khoản tiền chưa thanh toán còn dính tới 1 người: khoản chi chưa chốt
+// (là người chi hoặc người tham gia) + giao dịch chưa đánh dấu đã thanh toán ở các
+// kỳ đã chốt (là người trả hoặc người nhận). Trả về mảng mô tả, rỗng = xoá được.
+export async function findUnpaidForMember(ten) {
+  const [{ expenses, shares }, settleSnap] = await Promise.all([
+    fetchOpenExpensesAndShares(),
+    getDocs(collection(db, "settlements")),
+  ]);
+  const reasons = [];
+  const soKhoanMo = new Set([
+    ...expenses.filter((e) => e.nguoiChi === ten).map((e) => e.id),
+    ...shares.filter((s) => s.nguoiThamGia === ten).map((s) => s.expenseId),
+  ]).size;
+  if (soKhoanMo > 0) reasons.push(`${soKhoanMo} khoản chi chưa chốt sổ`);
+
+  settleSnap.forEach((d) => {
+    const { kyId, transactions = [] } = d.data();
+    transactions
+      .filter((t) => !t.daThanhToan && (t.tu === ten || t.den === ten))
+      .forEach((t) =>
+        reasons.push(`Kỳ ${kyId || d.id}: ${t.tu} → ${t.den} ${t.soTien.toLocaleString("vi-VN")}đ chưa thanh toán`)
+      );
+  });
+  return reasons;
+}
+
+// Xoá thành viên (popup "Quản lý người dùng"). Chỉ cho xoá khi người đó không còn
+// khoản tiền nào chưa thanh toán; dữ liệu lịch sử vẫn giữ nguyên tên người đã xoá.
+export async function deleteMember(ten) {
+  const reasons = await findUnpaidForMember(ten);
+  if (reasons.length > 0) {
+    const err = new Error(`Không thể xoá "${ten}" vì còn: ${reasons.join("; ")}.`);
+    err.code = "has-unpaid";
+    throw err;
+  }
+  const snap = await getDocs(query(collection(db, "members"), where("ten", "==", ten)));
+  const batch = writeBatch(db);
+  snap.docs.forEach((d) => batch.delete(d.ref));
+  await batch.commit();
 }

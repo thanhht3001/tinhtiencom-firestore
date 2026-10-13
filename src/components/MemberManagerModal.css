@@ -1,0 +1,85 @@
+.member-modal {
+  max-width: 380px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+
+.member-tabs {
+  margin-bottom: 0;
+}
+
+.member-tabs .tab {
+  flex: 1;
+}
+
+.member-tab-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.member-tab-body .hint {
+  margin: 0;
+}
+
+.member-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.member-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+}
+
+.member-row + .member-row {
+  border-top: 1px solid var(--color-border);
+}
+
+.member-name {
+  font-size: 0.95rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-row-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.member-btn {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.member-btn-danger {
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
+.member-btn-danger:hover:not(:disabled) {
+  background: var(--color-error-bg);
+}
+
+.member-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

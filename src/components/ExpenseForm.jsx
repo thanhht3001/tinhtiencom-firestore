@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createExpense } from "../lib/firestoreApi";
 import Combobox from "./Combobox";
-import AddMemberModal from "./AddMemberModal";
+import MemberManagerModal from "./MemberManagerModal";
 import ChiTieuChuaChot from "./ChiTieuChuaChot";
 import "./ExpenseForm.css";
 
@@ -10,7 +10,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 const formatVnd = (value) => Number(value || 0).toLocaleString("vi-VN") + " đ";
 
 export default function ExpenseForm({ thanhVienList, danhMucNoiDung, onPinRejected, onMembersChanged }) {
-  const [showAddMember, setShowAddMember] = useState(false);
+  const [showMembers, setShowMembers] = useState(false);
   const [ngayChi, setNgayChi] = useState(today());
   const [noiDung, setNoiDung] = useState("");
   const [soTien, setSoTien] = useState("");
@@ -27,6 +27,15 @@ export default function ExpenseForm({ thanhVienList, danhMucNoiDung, onPinReject
 
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState(null); // { type: 'success' | 'error', message }
+
+  // Người vừa bị xoá ở popup "Quản lý người dùng" thì bỏ khỏi lựa chọn hiện tại.
+  useEffect(() => {
+    setNguoiChi((prev) => (prev && !thanhVienList.includes(prev) ? "" : prev));
+    setThamGia((prev) => {
+      const next = prev.filter((n) => thanhVienList.includes(n));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [thanhVienList]);
 
   const soTienNumber = Number(soTien) || 0;
 
@@ -191,10 +200,10 @@ export default function ExpenseForm({ thanhVienList, danhMucNoiDung, onPinReject
           <button
             type="button"
             className="pill pill-add"
-            onClick={() => setShowAddMember(true)}
-            title="Thêm người dùng"
+            onClick={() => setShowMembers(true)}
+            title="Quản lý người dùng"
           >
-            + Thêm người
+            Quản lý người dùng
           </button>
           {!dataReady && <span className="hint">Chưa có thành viên nào.</span>}
         </div>
@@ -252,14 +261,11 @@ export default function ExpenseForm({ thanhVienList, danhMucNoiDung, onPinReject
       {status && <p className={`status status-${status.type}`}>{status.message}</p>}
     </form>
       <ChiTieuChuaChot onPinRejected={onPinRejected} />
-      {showAddMember && (
-        <AddMemberModal
+      {showMembers && (
+        <MemberManagerModal
           existingNames={thanhVienList}
-          onClose={() => setShowAddMember(false)}
-          onSaved={async () => {
-            await onMembersChanged?.();
-            setShowAddMember(false);
-          }}
+          onClose={() => setShowMembers(false)}
+          onChanged={() => onMembersChanged?.()}
         />
       )}
     </>
